@@ -1,0 +1,14 @@
+title: My Blog
+tagline: A Jekyll blog with tags and a clean reading theme
+description: A minimal Jekyll blog with tag filtering, RSS, a sitemap, and a clean reading theme. Fork it, change the title, and start writing.
+url: "https://example.com"
+# Leave baseurl empty for a user site (username.github.io). For a project site
+# (username.github.io/repo), the included GitHub Actions workflow sets it for you;
+# if you build manually, set it to "/repo" instead.
+baseurl: ""
+author:
+  name: Your Name
+
+plugins:
+  - jekyll-seo-tag
+  - jekyll-sitemap

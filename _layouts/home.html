@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  {% seo %}
+  <link rel="alternate" type="application/rss+xml" title="{{ site.title }}" href="{{ site.url }}/feed.xml" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-size: 18px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+      line-height: 1.6;
+    }
+
+    body { margin: 0; }
+
+    a { color: #1a1a1a; }
+    a:visited { color: #1a1a1a; }
+
+    /* ── Header ─────────────────────────────── */
+    .site-header {
+      padding: 2rem 1.5rem 1.25rem;
+      border-bottom: 1px solid #e8e8e8;
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    .site-header h1 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .site-header h1 a {
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .tagline {
+      color: #555;
+      font-size: 0.9rem;
+      margin: 0.3rem 0 0;
+    }
+
+    .header-links {
+      margin-top: 0.6rem;
+      font-size: 0.85rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.2rem 0.6rem;
+      align-items: center;
+    }
+
+    .header-links a { color: #444; text-decoration: none; }
+    .header-links a:hover { text-decoration: underline; text-underline-offset: 2px; }
+    .sep { color: #ccc; user-select: none; }
+
+    /* ── Layout wrapper ──────────────────────── */
+    .layout-wrapper {
+      display: grid;
+      grid-template-columns: 185px 1fr;
+      gap: 3rem;
+      max-width: 960px;
+      margin: 2rem auto 3rem;
+      padding: 0 1.5rem;
+      align-items: start;
+    }
+
+    /* ── Tags sidebar ────────────────────────── */
+    .tags-sidebar {
+      position: sticky;
+      top: 1.5rem;
+    }
+
+    .tags-heading {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #999;
+      margin: 0 0 0.6rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid #e4e4e4;
+    }
+
+    .tags-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .tags-list li {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding: 0.18rem 0;
+    }
+
+    .tag-link {
+      text-decoration: none;
+      color: #555;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: color 0.12s;
+    }
+
+    .tag-link:hover { color: #1a1a1a; }
+
+    .tag-link.active {
+      color: #1a1a1a;
+      font-weight: 700;
+    }
+
+    .tag-count {
+      font-size: 0.68rem;
+      color: #bbb;
+      margin-left: 0.3rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ── Posts main ──────────────────────────── */
+    .posts-main { min-width: 0; }
+
+    .month-group { margin-bottom: 1.8rem; }
+
+    .month-heading {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #999;
+      margin: 0 0 0.4rem;
+      padding-bottom: 0.3rem;
+      border-bottom: 1px solid #efefef;
+    }
+
+    .month-posts {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .month-posts li {
+      padding: 0.32rem 0;
+    }
+
+    .month-posts li a {
+      text-decoration: none;
+      color: #1a1a1a;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+
+    .month-posts li a:hover {
+      text-decoration: underline;
+      text-underline-offset: 2px;
+    }
+
+    /* filtering states */
+    .month-posts li.hidden { display: none; }
+    .month-group.empty { display: none; }
+
+    /* ── Footer ──────────────────────────────── */
+    .site-footer {
+      max-width: 960px;
+      margin: 0 auto 2rem;
+      padding: 1rem 1.5rem;
+      border-top: 1px solid #efefef;
+      font-size: 0.78rem;
+      color: #aaa;
+    }
+
+    /* ── Mobile ──────────────────────────────── */
+    @media (max-width: 640px) {
+      html { font-size: 16px; }
+
+      .site-header { padding: 1.2rem 1rem 1rem; }
+      .site-header h1 { font-size: 1.5rem; }
+
+      .layout-wrapper {
+        grid-template-columns: 1fr;
+        gap: 0;
+        margin-top: 0;
+        padding: 0;
+      }
+
+      /* Sidebar becomes a pill strip at the top */
+      .tags-sidebar {
+        position: static;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid #efefef;
+        background: #fafafa;
+      }
+
+      .tags-heading { display: none; }
+
+      .tags-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+      }
+
+      .tags-list li {
+        display: block;
+        padding: 0;
+      }
+
+      .tag-link {
+        display: inline-block;
+        padding: 0.22em 0.65em;
+        background: #f0f0f0;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        color: #444;
+        transition: background 0.12s;
+      }
+
+      .tag-link:hover { background: #e4e4e4; color: #1a1a1a; font-weight: normal; }
+
+      .tag-link.active {
+        background: #1a1a1a;
+        color: #fff;
+        font-weight: 500;
+      }
+
+      .tag-count { display: none; }
+
+      .posts-main { padding: 1.25rem 1rem; }
+
+      .month-group { margin-bottom: 1.4rem; }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-header">
+    <h1><a href="{{ site.baseurl }}/">{{ site.title }}</a></h1>
+    <p class="tagline">{{ site.tagline }}</p>
+    <nav class="header-links">
+      <a href="{{ site.baseurl }}/feed.xml">RSS</a>
+    </nav>
+  </header>
+
+  <div class="layout-wrapper">
+    <aside class="tags-sidebar">
+      <h2 class="tags-heading">Tags</h2>
+      <ul id="tags-list" class="tags-list">
+        {%- assign all_tags = "" -%}
+        {%- assign typed_posts = site.pages | where: "type", "post" -%}
+        {%- for post in typed_posts -%}
+          {%- for tag in post.tags -%}
+            {%- assign all_tags = all_tags | append: tag | append: "|||" -%}
+          {%- endfor -%}
+        {%- endfor -%}
+        {%- assign tag_flat = all_tags | split: "|||" -%}
+        {%- assign unique_tags = tag_flat | uniq | sort -%}
+        {%- for tag in unique_tags -%}
+          {%- assign count = 0 -%}
+          {%- for t in tag_flat -%}
+            {%- if t == tag -%}{%- assign count = count | plus: 1 -%}{%- endif -%}
+          {%- endfor -%}
+          <li data-count="{{ count }}">
+            <a href="{{ site.baseurl }}/?tag={{ tag }}" class="tag-link" data-tag="{{ tag }}">#{{ tag }}</a>
+          </li>
+        {%- endfor -%}
+      </ul>
+    </aside>
+
+    <main class="posts-main">
+      {%- assign sorted_posts = site.pages | where: "type", "post" | sort: "date" | reverse -%}
+      {%- assign prev_group = "" -%}
+      {%- for post in sorted_posts -%}
+        {%- assign this_group = post.date | date: "%B %Y" -%}
+        {%- if this_group != prev_group -%}
+          {%- unless forloop.first -%}</ul></div>{%- endunless -%}
+          <div class="month-group">
+          <h2 class="month-heading">{{ this_group }}</h2>
+          <ul class="month-posts">
+          {%- assign prev_group = this_group -%}
+        {%- endif -%}
+        <li data-tags="{{ post.tags | join: ',' }}"><a href="{{ post.url }}">{{ post.title }}</a></li>
+        {%- if forloop.last -%}</ul></div>{%- endif -%}
+      {%- endfor -%}
+    </main>
+  </div>
+
+  <footer class="site-footer">
+    &copy; {{ site.time | date: '%Y' }} {{ site.author.name }}
+  </footer>
+
+  <script src="{{ site.baseurl }}/assets/js/tag-filter.js"></script>
+</body>
+
+</html>

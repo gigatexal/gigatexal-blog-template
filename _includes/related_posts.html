@@ -1,0 +1,4 @@
+{% if page.type == "post" %}
+<div id="related-posts" data-url="{{ page.url }}" data-tags="{{ page.tags | join: ',' }}" data-baseurl="{{ site.baseurl }}"></div>
+<script src="{{ site.baseurl }}/assets/js/related-posts.js"></script>
+{% endif %}

@@ -1,0 +1,5 @@
+---
+layout: none
+permalink: /posts.json
+---
+{% assign posts = site.pages | where: "type", "post" | sort: "date" | reverse %}[{% for post in posts %}{% unless forloop.first %},{% endunless %}{"url":{{ post.url | jsonify }},"title":{{ post.title | jsonify }},"tags":{{ post.tags | jsonify }},"description":{{ post.description | jsonify }},"date":"{{ post.date | date: "%Y-%m-%d" }}"}{% endfor %}]
