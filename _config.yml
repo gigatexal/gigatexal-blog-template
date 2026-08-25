@@ -12,6 +12,14 @@ baseurl: ""
 # push to `main`. Leave `false` while using this repo as a plain template.
 pages_deploy: false
 
+# Where post images are hosted. `local` (default) serves images from the repo
+# via GitHub Pages. Set to `s3` to offload posts marked `upload_images: true`
+# to any S3-compatible store (AWS S3, Cloudflare R2, MinIO, Backblaze B2) —
+# see the README ("Hosting images") for the required repository secrets.
+# Use the plain value `local` or `s3` (no quotes).
+image_host: local
+
+
 author:
   name: Your Name
 

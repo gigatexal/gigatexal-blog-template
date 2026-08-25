@@ -53,21 +53,28 @@ the repo but is gated behind the `pages_deploy` flag in `_config.yml` (default
 
 ## Writing a post
 
+The fastest way is to copy an existing post and rename it:
+
+```sh
+cp -r pages/getting-started pages/my-new-post
+mv pages/my-new-post/getting-started.md pages/my-new-post/my-new-post.md
+```
+
 Each post is its own folder under `pages/`, with a Markdown file named after the
-folder:
+folder (`pages/<slug>/<slug>.md`):
 
 ```text
 pages/
-  my-post/
-    my-post.md
+  my-new-post/
+    my-new-post.md
 ```
 
-Front matter:
+Then edit the front matter:
 
 ```yaml
 ---
 layout: default
-title: My Post
+title: My New Post
 description: A one-line summary used for SEO and the feed.
 type: post      # "post" shows it on the home page; "page" hides it
 tags: [jekyll, tutorial]
@@ -75,9 +82,45 @@ date: 2026-01-15
 ---
 ```
 
-- `type: post` includes the page in the home listing and the tag sidebar.
+- `type: post` includes the page in the home listing, tag sidebar, RSS feed, and
+  `posts.json` — nothing else to register. The home page is rebuilt automatically
+  on every deploy, so **there is no `index.md` to edit**.
 - `type: page` keeps a page out of the listing (use it for an About page).
 - `tags` is a YAML list of short, lowercase, hyphenated words.
+- Optional: `upload_images: true` offloads this post's images to object storage
+  (see [Hosting images](#hosting-images)).
+
+## Hosting images
+
+By default, images live next to their post (e.g. `pages/my-new-post/photo.png`)
+and are served directly by GitHub Pages — no setup required. Reference them in
+Markdown as `![alt text](/pages/my-new-post/photo.png)`.
+
+To offload images to object storage, set `upload_images: true` on a post and
+choose a backend with `image_host` in `_config.yml`:
+
+| `image_host` | Behavior |
+|---|---|
+| `local` (default) | Images are served from the repo; `upload_images: true` is ignored. |
+| `s3` | Posts with `upload_images: true` are uploaded to an S3-compatible bucket and their image URLs are rewritten to the bucket's public URL at build time. |
+
+`image_host: s3` works with any S3-compatible store — AWS S3, Cloudflare R2,
+MinIO, or Backblaze B2. Configure it with these **repository secrets**
+(GitHub → **Settings → Secrets and variables → Actions**):
+
+| Secret | Required | Purpose |
+|---|---|---|
+| `IMAGES_BUCKET` | yes | Bucket name |
+| `IMAGES_ACCESS_KEY_ID` | yes | Access key id |
+| `IMAGES_SECRET_ACCESS_KEY` | yes | Secret access key |
+| `IMAGES_PUBLIC_URL` | yes | Public/CDN base URL images are served from |
+| `IMAGES_ENDPOINT_URL` | for R2/MinIO/B2 | S3 endpoint; omit for AWS S3 |
+| `IMAGES_REGION` | optional | AWS region (default `us-east-1`) |
+
+The pipeline runs in `.github/workflows/pages.yml`: `scripts/images.py upload`
+before `jekyll build` and `scripts/images.py rewrite` after. Both run only when
+`image_host` is not `local`, and secrets are injected as environment variables —
+never committed.
 
 ## How tags work
 
@@ -99,6 +142,7 @@ Everything site-wide lives in `_config.yml`:
 | `url` | Absolute site URL (required for SEO/sitemap/feed) |
 | `baseurl` | Sub-path for project sites; usually leave empty |
 | `pages_deploy` | `true` enables the GitHub Pages deploy workflow (default `false`) |
+| `image_host` | `local` (default) or `s3` — where `upload_images: true` posts' images go |
 | `author.name` | Shown in the footer and RSS `<dc:creator>` |
 
 ## Customizing the theme

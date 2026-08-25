@@ -15,23 +15,29 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Preflight: read the `pages_deploy` flag from _config.yml. The build and
-  # deploy jobs only run when it is `true`, so this workflow is a no-op in a
-  # repo that hasn't opted in.
+  # Preflight: read the `pages_deploy` and `image_host` flags from _config.yml.
+  # Build/deploy only run when `pages_deploy` is true; the image steps only run
+  # when `image_host` is not `local`.
   check:
     runs-on: ubuntu-latest
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
+      image_host: ${{ steps.check.outputs.image_host }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Read pages_deploy flag
+      - name: Read deploy flags
         id: check
         run: |
           if grep -qE '^pages_deploy:[[:space:]]*true' _config.yml; then
             echo "enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE '^image_host:[[:space:]]*s3' _config.yml; then
+            echo "image_host=s3" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_host=local" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -41,17 +47,47 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        if: needs.check.outputs.image_host != 'local'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install image script deps
+        if: needs.check.outputs.image_host != 'local'
+        run: pip install -r scripts/requirements.txt
+
+      - name: Upload images to object storage
+        if: needs.check.outputs.image_host != 'local'
+        run: python3 scripts/images.py upload
+        env:
+          IMAGES_BUCKET: ${{ secrets.IMAGES_BUCKET }}
+          IMAGES_ACCESS_KEY_ID: ${{ secrets.IMAGES_ACCESS_KEY_ID }}
+          IMAGES_SECRET_ACCESS_KEY: ${{ secrets.IMAGES_SECRET_ACCESS_KEY }}
+          IMAGES_ENDPOINT_URL: ${{ secrets.IMAGES_ENDPOINT_URL }}
+          IMAGES_REGION: ${{ secrets.IMAGES_REGION }}
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Setup Ruby
         uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.2'
           bundler-cache: true
+
       - name: Build with Jekyll
         run: bundle exec jekyll build --baseurl "${{ steps.pages.outputs.base_path }}"
         env:
           JEKYLL_ENV: production
+
+      - name: Rewrite image URLs to object storage
+        if: needs.check.outputs.image_host != 'local'
+        run: python3 scripts/images.py rewrite
+        env:
+          IMAGES_PUBLIC_URL: ${{ secrets.IMAGES_PUBLIC_URL }}
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
 
