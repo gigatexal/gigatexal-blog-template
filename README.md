@@ -31,20 +31,22 @@ Open <http://localhost:4000>. Jekyll rebuilds the site as you edit files.
 
 ## Deploying to GitHub Pages
 
-This repo deploys with a GitHub Actions workflow (`.github/workflows/pages.yml`),
-so it builds with Jekyll 4 rather than GitHub's older built-in builder.
+Deployment is **opt-in**. The workflow (`.github/workflows/pages.yml`) ships in
+the repo but is gated behind the `pages_deploy` flag in `_config.yml` (default
+`false`), so it does nothing until you switch it on.
 
-1. Push the repo to GitHub.
-2. Enable Pages with Actions as the source: **Settings → Pages →
-   "Build and deployment" → Source → GitHub Actions**. See GitHub's guide,
-   [Configuring a publishing source for your GitHub Pages
-   site](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
-3. Update `url` in `_config.yml` to your site URL:
+1. In `_config.yml`, set `pages_deploy: true`.
+2. Update `url` in `_config.yml` to your site URL:
    - user site (`username.github.io`): `https://username.github.io`
    - project site (`username.github.io/repo`): `https://username.github.io`
      (leave `baseurl` empty — the workflow sets it automatically).
-4. Push. The workflow builds and deploys on every push to `main`; watch progress
-   under the repo's **Actions** tab.
+3. Push the repo to GitHub.
+4. Enable Pages with Actions as the source: **Settings → Pages →
+   "Build and deployment" → Source → GitHub Actions**. See GitHub's guide,
+   [Configuring a publishing source for your GitHub Pages
+   site](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
+5. Push. The workflow builds and publishes on every push to `main`; watch
+   progress under the repo's **Actions** tab.
 
 > The workflow triggers on the `main` branch. If your default branch is
 > `master`, change the `branches:` list in `.github/workflows/pages.yml`.
@@ -96,6 +98,7 @@ Everything site-wide lives in `_config.yml`:
 | `description` | Used by SEO and the RSS feed |
 | `url` | Absolute site URL (required for SEO/sitemap/feed) |
 | `baseurl` | Sub-path for project sites; usually leave empty |
+| `pages_deploy` | `true` enables the GitHub Pages deploy workflow (default `false`) |
 | `author.name` | Shown in the footer and RSS `<dc:creator>` |
 
 ## Customizing the theme

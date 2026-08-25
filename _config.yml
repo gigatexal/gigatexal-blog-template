@@ -6,6 +6,12 @@ url: "https://example.com"
 # (username.github.io/repo), the included GitHub Actions workflow sets it for you;
 # if you build manually, set it to "/repo" instead.
 baseurl: ""
+
+# GitHub Pages deploy switch. Set to `true` to activate the Actions workflow
+# (.github/workflows/pages.yml) that builds and publishes the site on every
+# push to `main`. Leave `false` while using this repo as a plain template.
+pages_deploy: false
+
 author:
   name: Your Name
 
