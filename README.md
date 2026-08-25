@@ -31,15 +31,20 @@ Open <http://localhost:4000>. Jekyll rebuilds the site as you edit files.
 
 ## Deploying to GitHub Pages
 
-This repo deploys with a GitHub Actions workflow (`.github/workflows/pages.yml`).
+This repo deploys with a GitHub Actions workflow (`.github/workflows/pages.yml`),
+so it builds with Jekyll 4 rather than GitHub's older built-in builder.
 
 1. Push the repo to GitHub.
-2. In the repo **Settings → Pages**, set the *Source* to **GitHub Actions**.
+2. Enable Pages with Actions as the source: **Settings → Pages →
+   "Build and deployment" → Source → GitHub Actions**. See GitHub's guide,
+   [Configuring a publishing source for your GitHub Pages
+   site](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 3. Update `url` in `_config.yml` to your site URL:
    - user site (`username.github.io`): `https://username.github.io`
    - project site (`username.github.io/repo`): `https://username.github.io`
      (leave `baseurl` empty — the workflow sets it automatically).
-4. Push. The workflow builds and deploys on every push to `main`.
+4. Push. The workflow builds and deploys on every push to `main`; watch progress
+   under the repo's **Actions** tab.
 
 > The workflow triggers on the `main` branch. If your default branch is
 > `master`, change the `branches:` list in `.github/workflows/pages.yml`.
