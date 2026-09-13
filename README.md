@@ -20,6 +20,26 @@ and start writing.
 - Ruby 3.1+
 - [Bundler](https://bundler.io)
 
+## Make targets
+
+`make` with no arguments builds the site. `make help` lists everything:
+
+| Target | What it does |
+|---|---|
+| `make` / `make build` | build the site into `_site/` |
+| `make serve` | dev server with livereload at <http://localhost:4000> |
+| `make install` | `bundle install` |
+| `make clean` | remove `_site/`, `.jekyll-cache/` and Python caches |
+| `make check-pages` | fail if any page under `pages/` is missing front matter |
+| `make venv` | create `.venv` and install `scripts/requirements.txt` |
+| `make images-upload ARGS="--dry-run"` | upload opted-in post images (see [Hosting images](#hosting-images)) |
+| `make images-rewrite IMAGES_PUBLIC_URL=… ARGS="--dry-run"` | preview/apply the `_site/` URL rewrite |
+
+Everything is plain `bundle` and `python3` — no container runtime, no host-specific
+paths, and no values of mine baked in. Nothing in the Makefile or the workflow is
+tied to a particular account: your domain, bucket and tokens live in `_config.yml`
+and repository secrets.
+
 ## Local development
 
 ```sh
@@ -50,6 +70,27 @@ the repo but is gated behind the `pages_deploy` flag in `_config.yml` (default
 
 > The workflow triggers on the `main` branch. If your default branch is
 > `master`, change the `branches:` list in `.github/workflows/pages.yml`.
+
+### Purging the CDN cache
+
+If your site sits behind a CDN (Cloudflare, Fastly, …), visitors can keep seeing
+a cached copy of a page after a deploy. The workflow ships an **opt-in** purge
+step for that:
+
+1. Set `cdn_purge: true` in `_config.yml`.
+2. Add these repository secrets (GitHub → **Settings → Secrets and variables →
+   Actions**):
+
+| Secret | Required | Purpose |
+|---|---|---|
+| `CF_ZONE_ID` | for the Cloudflare step | Zone to purge — Cloudflare dashboard → your domain → Overview |
+| `CF_API_TOKEN` | for the Cloudflare step | API token with the *Cache Purge* permission only |
+
+The step purges the whole zone after `deploy-pages` and fails the job if
+Cloudflare reports `success: false`. Using a different CDN? Replace the `run`
+block with your provider's API call, or delete the step — nothing else in the
+workflow depends on it. No value is ever written into the repo: the zone id and
+token are read from secrets at run time.
 
 ## Writing a post
 
@@ -162,6 +203,7 @@ Everything site-wide lives in `_config.yml`:
 | `url` | Absolute site URL (required for SEO/sitemap/feed) |
 | `baseurl` | Sub-path for project sites; usually leave empty |
 | `pages_deploy` | `true` enables the GitHub Pages deploy workflow (default `false`) |
+| `cdn_purge` | `true` purges your CDN's cache after each deploy (default `false`; see [Purging the CDN cache](#purging-the-cdn-cache)) |
 | `image_host` | `local` (default) or `s3` — where `upload_images: true` posts' images go |
 | `author.name` | Shown in the footer and RSS `<dc:creator>` |
 
