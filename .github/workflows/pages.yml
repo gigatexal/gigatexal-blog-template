@@ -15,14 +15,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  # Preflight: read the `pages_deploy` and `image_host` flags from _config.yml.
-  # Build/deploy only run when `pages_deploy` is true; the image steps only run
-  # when `image_host` is not `local`.
+  # Preflight: read the `pages_deploy`, `image_host` and `cdn_purge` flags from
+  # _config.yml. Build/deploy only run when `pages_deploy` is true; the image
+  # steps only run when `image_host` is not `local`; the CDN purge only runs when
+  # `cdn_purge` is true.
   check:
     runs-on: ubuntu-latest
     outputs:
       enabled: ${{ steps.check.outputs.enabled }}
       image_host: ${{ steps.check.outputs.image_host }}
+      cdn_purge: ${{ steps.check.outputs.cdn_purge }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -38,6 +40,11 @@ jobs:
             echo "image_host=s3" >> "$GITHUB_OUTPUT"
           else
             echo "image_host=local" >> "$GITHUB_OUTPUT"
+          fi
+          if grep -qE '^cdn_purge:[[:space:]]*true' _config.yml; then
+            echo "cdn_purge=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "cdn_purge=false" >> "$GITHUB_OUTPUT"
           fi
 
   build:
@@ -69,6 +76,7 @@ jobs:
           IMAGES_REGION: ${{ secrets.IMAGES_REGION }}
 
       - name: Setup Pages
+        id: pages
         uses: actions/configure-pages@v5
 
       - name: Setup Ruby
@@ -102,3 +110,22 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      # Optional CDN cache purge, off unless `cdn_purge: true` in _config.yml.
+      # Cloudflare example: purge the whole zone so a fresh deploy is visible
+      # immediately. Configure the CF_ZONE_ID and CF_API_TOKEN repository secrets
+      # (the token only needs cache-purge permission). Using another CDN? Replace
+      # the run block with your provider's API call, or delete this step.
+      - name: Purge CDN cache
+        if: needs.check.outputs.cdn_purge == 'true'
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+        run: |
+          resp=$(curl --fail-with-body -sS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CF_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything": true}')
+          echo "$resp"
+          echo "$resp" | jq -e '.success == true' >/dev/null

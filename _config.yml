@@ -12,6 +12,13 @@ baseurl: ""
 # push to `main`. Leave `false` while using this repo as a plain template.
 pages_deploy: false
 
+# CDN cache purge switch. Set to `true` to have the deploy workflow purge your
+# CDN's cache after publishing, so visitors don't see stale pages. The included
+# step talks to Cloudflare and needs the CF_ZONE_ID and CF_API_TOKEN repository
+# secrets — see the README ("Purging the CDN cache"). With another CDN, swap the
+# step for your provider's API call (or delete it).
+cdn_purge: false
+
 # Where post images are hosted. `local` (default) serves images from the repo
 # via GitHub Pages. Set to `s3` to offload posts marked `upload_images: true`
 # to any S3-compatible store (AWS S3, Cloudflare R2, MinIO, Backblaze B2) —
