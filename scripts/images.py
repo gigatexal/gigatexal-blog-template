@@ -10,9 +10,13 @@ directly from the repo by GitHub Pages and this script is never invoked. When
     python3 scripts/images.py upload    # before `jekyll build`
     python3 scripts/images.py rewrite   # after  `jekyll build`
 
-`upload` copies every non-`.md` file in an opted-in post's directory to
-`images/<slug>/<relative-path>` in the bucket. `rewrite` updates the built HTML
-in `_site/` so image references point at `IMAGES_PUBLIC_URL`.
+`upload` copies every media file in an opted-in post's directory (recursively;
+`.md` sources, hidden files and OS junk such as `.DS_Store` are skipped) to
+`images/<slug>/<relative-path>` in the bucket, tagging each object with a
+`Cache-Control` header. `rewrite` updates the built HTML in `_site/` so image
+references point at `IMAGES_PUBLIC_URL` — only references that resolve to a file
+actually present in that post's directory are rewritten, so links to pages,
+anchors, other posts and other sites are left alone.
 
 Environment variables (injected as GitHub Actions secrets — never committed):
 
@@ -25,6 +29,8 @@ Environment variables (injected as GitHub Actions secrets — never committed):
     IMAGES_ENDPOINT_URL        S3 endpoint (R2/MinIO/B2); omit for AWS S3
     IMAGES_REGION              AWS region (default us-east-1); unused when
                                IMAGES_ENDPOINT_URL is set (R2 uses `auto`)
+    IMAGES_CACHE_CONTROL       Cache-Control sent with uploaded objects
+                               (default `public, max-age=86400`)
 """
 
 import os
@@ -39,6 +45,11 @@ import yaml
 
 PAGES_DIR = Path('pages')
 SITE_DIR = Path('_site')
+
+# Files that show up in post folders but are never real images.
+SKIP_NAMES = {'.DS_Store', 'Thumbs.db', 'desktop.ini'}
+
+DEFAULT_CACHE_CONTROL = 'public, max-age=86400'
 
 
 def parse_frontmatter(md_path):
@@ -61,10 +72,19 @@ def find_opted_in_slugs():
     return slugs
 
 
+def is_media_file(path):
+    """True for post files that belong in the bucket: not markdown, not junk."""
+    name = path.name
+    return (path.is_file()
+            and path.suffix.lower() != '.md'
+            and not name.startswith('.')
+            and name not in SKIP_NAMES)
+
+
 def find_media_files(slug):
     post_dir = PAGES_DIR / slug
-    return [f for f in post_dir.rglob('*')
-            if f.is_file() and f.suffix.lower() != '.md']
+    return sorted((f for f in post_dir.rglob('*') if is_media_file(f)),
+                  key=lambda f: f.as_posix())
 
 
 def require_env(*names):
@@ -111,6 +131,10 @@ def cmd_upload(args):
         client = s3_client()
         bucket = os.environ['IMAGES_BUCKET']
 
+    cache_control = os.environ.get('IMAGES_CACHE_CONTROL') or DEFAULT_CACHE_CONTROL
+    if not args.dry_run:
+        print(f"Cache-Control: {cache_control}")
+
     total = 0
     errors = 0
     for slug in slugs:
@@ -120,7 +144,7 @@ def cmd_upload(args):
             continue
         print(f"  [{slug}] {len(media)} file(s):")
         for f in media:
-            rel_path = f.relative_to(PAGES_DIR / slug)
+            rel_path = f.relative_to(PAGES_DIR / slug).as_posix()
             key = f"images/{slug}/{rel_path}"
             if args.dry_run:
                 print(f"    [DRY RUN] {f} -> {key}")
@@ -131,7 +155,8 @@ def cmd_upload(args):
                 try:
                     client.upload_file(
                         str(f), bucket, key,
-                        ExtraArgs={'ContentType': content_type})
+                        ExtraArgs={'ContentType': content_type,
+                                   'CacheControl': cache_control})
                 except Exception as e:
                     print(f"    ERROR uploading {f}: {e}")
                     errors += 1
@@ -150,59 +175,72 @@ def cmd_upload(args):
 ATTR_RE = re.compile(r'(src|href)="([^"]*)"')
 
 
+def resolve_media_url(url, slug, media_basenames, media_rel_paths):
+    """Post-relative media path this URL points at, or None if it is not media.
+
+    A URL only counts when it resolves to a file that is actually present in the
+    post's directory, so `/pages/<slug>/<slug>.html` and other page links are
+    never pointed at the bucket. Query strings and fragments are preserved.
+    """
+    if not url or url.startswith(('#', 'data:', '//')):
+        return None
+    if url.startswith('http://') or url.startswith('https://'):
+        return None
+
+    path, sep_q, query = url.partition('?')
+    path, sep_f, fragment = path.partition('#')
+    suffix = (sep_q + query) + (sep_f + fragment)
+
+    # Pattern A: absolute /pages/<slug>/<rest>
+    prefix = f'/pages/{slug}/'
+    idx = path.find(prefix)
+    if idx != -1:
+        rest = path[idx + len(prefix):]
+        return rest + suffix if rest in media_rel_paths else None
+
+    # Pattern B: bare filename (relative, no directory components)
+    if '/' not in path and '\\' not in path:
+        return path + suffix if path in media_basenames else None
+
+    # Pattern C: relative path with subdirectories (e.g. ./images/photo.png)
+    stripped = path[2:] if path.startswith('./') else path
+    return stripped + suffix if stripped in media_rel_paths else None
+
+
+def map_urls(content, slug, media_basenames, media_rel_paths, public_url):
+    """Return (rewritten HTML, [(old_url, new_url), ...])."""
+    rewrites = []
+
+    def replace(m):
+        attr, url = m.group(1), m.group(2)
+        target = resolve_media_url(url, slug, media_basenames, media_rel_paths)
+        if target is None:
+            return m.group(0)
+        new_url = f'{public_url}/images/{slug}/{target}'
+        rewrites.append((url, new_url))
+        return f'{attr}="{new_url}"'
+
+    return ATTR_RE.sub(replace, content), rewrites
+
+
 def rewrite_html(html_path, slug, media_basenames, media_rel_paths, public_url):
+    """Rewrite media URLs in place. Returns [(old_url, new_url), ...]."""
     with open(html_path) as f:
         content = f.read()
 
-    changed = False
-
-    def replace(m):
-        nonlocal changed
-        attr, url = m.group(1), m.group(2)
-
-        # Skip URLs that are already external.
-        if url.startswith('http://') or url.startswith('https://'):
-            return m.group(0)
-
-        # Pattern A: absolute /pages/<slug>/<rest>
-        prefix = f'/pages/{slug}/'
-        idx = url.find(prefix)
-        if idx != -1:
-            rest = url[idx + len(prefix):]
-            changed = True
-            return f'{attr}="{public_url}/images/{slug}/{rest}"'
-
-        # Pattern B: bare filename (relative, no directory components)
-        if '/' not in url and '\\' not in url:
-            if url in media_basenames:
-                changed = True
-                return f'{attr}="{public_url}/images/{slug}/{url}"'
-
-        # Pattern C: relative path with subdirectories (e.g. ./images/photo.png)
-        stripped = url[2:] if url.startswith('./') else url
-        if stripped in media_rel_paths:
-            changed = True
-            return f'{attr}="{public_url}/images/{slug}/{stripped}"'
-
-        return m.group(0)
-
-    new_content = ATTR_RE.sub(replace, content)
-
-    if changed:
+    new_content, rewrites = map_urls(content, slug, media_basenames,
+                                     media_rel_paths, public_url)
+    if rewrites:
         with open(html_path, 'w') as f:
             f.write(new_content)
-        return True
-    return False
+    return rewrites
 
 
 def media_index(slug):
     post_dir = PAGES_DIR / slug
-    names = set()
-    rel_paths = set()
-    for f in post_dir.rglob('*'):
-        if f.is_file() and f.suffix.lower() != '.md':
-            names.add(f.name)
-            rel_paths.add(str(f.relative_to(post_dir)))
+    media = find_media_files(slug)
+    names = {f.name for f in media}
+    rel_paths = {f.relative_to(post_dir).as_posix() for f in media}
     return names, rel_paths
 
 
@@ -234,32 +272,22 @@ def cmd_rewrite(args):
 
         if args.dry_run:
             with open(html_file) as f:
-                content = f.read()
-            rewrites = 0
-            for _, url in ATTR_RE.findall(content):
-                if url.startswith('http://') or url.startswith('https://'):
-                    continue
-                prefix = f'/pages/{slug}/'
-                idx = url.find(prefix)
-                if idx != -1:
-                    rewrites += 1
-                elif '/' not in url and '\\' not in url and url in media_basenames:
-                    rewrites += 1
-                else:
-                    stripped = url[2:] if url.startswith('./') else url
-                    if stripped in media_rel_paths:
-                        rewrites += 1
-            if rewrites:
-                print(f"  [{slug}] {rewrites} URL(s) would be rewritten")
-            else:
-                print(f"  [{slug}] No URLs to rewrite")
+                _, rewrites = map_urls(f.read(), slug, media_basenames,
+                                       media_rel_paths, public_url)
         else:
-            if rewrite_html(html_file, slug, media_basenames,
-                            media_rel_paths, public_url):
-                print(f"  [{slug}] Rewritten: {html_file}")
+            rewrites = rewrite_html(html_file, slug, media_basenames,
+                                    media_rel_paths, public_url)
+            if rewrites:
                 total_rewritten += 1
-            else:
-                print(f"  [{slug}] No URLs to rewrite in {html_file}")
+
+        label = '[DRY RUN] ' if args.dry_run else ''
+        for old, new in rewrites:
+            print(f"    {label}{old} -> {new}")
+        if rewrites:
+            print(f"  [{slug}] {len(rewrites)} URL(s) "
+                  f"{'would be rewritten' if args.dry_run else 'rewritten'}")
+        else:
+            print(f"  [{slug}] No URLs to rewrite in {html_file}")
 
     if args.dry_run:
         print("\nDry run complete.")

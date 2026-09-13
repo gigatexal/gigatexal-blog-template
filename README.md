@@ -94,7 +94,8 @@ date: 2026-01-15
 
 By default, images live next to their post (e.g. `pages/my-new-post/photo.png`)
 and are served directly by GitHub Pages — no setup required. Reference them in
-Markdown as `![alt text](/pages/my-new-post/photo.png)`.
+Markdown as `![alt text](/pages/my-new-post/photo.png)` or
+`![alt text](./photo.png)`; both work with either backend.
 
 To offload images to object storage, set `upload_images: true` on a post and
 choose a backend with `image_host` in `_config.yml`:
@@ -121,6 +122,25 @@ The pipeline runs in `.github/workflows/pages.yml`: `scripts/images.py upload`
 before `jekyll build` and `scripts/images.py rewrite` after. Both run only when
 `image_host` is not `local`, and secrets are injected as environment variables —
 never committed.
+
+What the two steps do, precisely:
+
+- **upload** copies every media file in the post's folder, recursively, to
+  `images/<slug>/<relative-path>`. Markdown sources, hidden files and OS junk
+  (`.DS_Store`, `Thumbs.db`, `desktop.ini`) are skipped, and each object is
+  tagged with `Content-Type` and `Cache-Control`. Set `IMAGES_CACHE_CONTROL`
+  (repository *variable* or secret) to change the header; the default is
+  `public, max-age=86400`.
+- **rewrite** only touches `src`/`href` values that resolve to a file actually
+  present in that post's folder — links to pages (`/pages/<slug>/<slug>.html`),
+  anchors, `data:` URIs, other posts and other sites are left alone, and
+  `?query`/`#fragment` suffixes are preserved. Both steps can be previewed
+  locally with `python3 scripts/images.py upload --dry-run` / `rewrite --dry-run`
+  (dry runs of `rewrite` need `IMAGES_PUBLIC_URL` in the environment).
+- Deleting an image from the repo does **not** delete it from your bucket: there
+  is no prune step, so remove stale objects in your storage dashboard.
+- Your Markdown keeps local paths; only the built `_site/` HTML points at
+  `IMAGES_PUBLIC_URL`, so local `jekyll serve` still works without the bucket.
 
 ## How tags work
 
